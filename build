@@ -1,0 +1,47 @@
+#!/bin/sh
+
+# directory to cache our dependencies
+mkdir -p gosrc_amd64
+# fetch linux-amd64 godeps
+echo "Fetching Dependencies... (this may take a while the first run)"
+echo 
+docker run --rm \
+  -w//build/cli \
+  -v/$PWD/cli://build/cli \
+  -v/$PWD/gosrc_amd64://go/src \
+  golang:1.8 \
+  go get -v -d ./...
+
+# directory for our build binaries
+mkdir -p bin
+echo
+echo "Building cli --> bin/kssh"
+echo 
+# build our cli inside a go container
+docker run --rm \
+  -w//go/src/go-kssh/cli \
+  -v/$PWD/bin://build \
+  -v/$PWD/gosrc_amd64://go/src \
+  -v/$PWD/cli://go/src/go-kssh/cli \
+  golang:1.8 \
+  go build -v -o //build/kssh
+# make the resulting binary executable
+chmod +x bin/kssh
+
+echo
+echo "Testing cli: bin/kssh"
+echo 
+# no tests yet, but the least we can do is demo that the binary works
+docker run --rm \
+  -v/$PWD/bin://test \
+  frolvlad/alpine-glibc \
+  sh -c '
+  echo [ HELP ]
+  (set -x; /test/kssh;)
+  echo
+  echo [ ADD hello ]
+  (set -x; /test/kssh add hello;)
+  echo
+  echo [ ADD usage error ]
+  (set -x; /test/kssh add)
+  '
